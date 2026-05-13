@@ -1,0 +1,9 @@
+{
+  "JwtSettings": {
+    "Key": "This is a secret key for jwt token ffhjffnsnfbdbsbfbbfbnsdfbdnsf",
+    "Issuer": "https://localhost:7196",
+    "Audience": "https://localhost:7196",
+    "AccessTokenExpirationInMinutes": 30,
+    "RefreshTokenExpirationInDays": 7
+  }
+}
