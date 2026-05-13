@@ -1,0 +1,97 @@
+﻿@using Shared.Enums
+
+@rendermode InteractiveServer
+
+@inject ILogger<DailyReport> logger
+@inject IFinancialReportService financialReportService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="date">Date</label>
+                <InputDate id="date" class="form-control" @bind-Value="Date" />
+            </div>
+
+            <div class="form-group mt-3">
+                <button class="btn btn-primary" @onclick="async () => await GetDateReportAsync(Date)">Get Operations</button>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            @if (ReportModel != null)
+            {
+                <div class="table mt-3">
+                    <h3>Operations for date: @ReportModel.Date</h3>
+                    <p>Total Income: <span class="text-success">@ReportModel.TotalIncome</span></p>
+                    <p>Total Expense: <span class="text-danger">@ReportModel.TotalExpense</span></p>
+
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var operation in ReportModel.Operations)
+                            {
+                                <tr>
+                                    <td>@operation.Date</td>
+                                    <td>@operation.Type</td>
+                                    <td class="@GetAmountClass(operation.Type)">@GetAmountSign(operation.Type)@operation.Amount.ToString("N2")</td>
+                                    <td>@operation.Description</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? AlertMessage { get; set; }
+
+    [Parameter]
+    public EventCallback<string> AlertMessageChanged { get; set; }
+
+    public DateOnly Date { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DailyReport? ReportModel { get; set; }
+
+    private async Task GetDateReportAsync(DateOnly date)
+    {
+        try
+        {
+            var dateReport = await financialReportService.GetDailyReportAsync(date);
+
+            if (dateReport != null)
+            {
+                ReportModel = dateReport;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Get operations failed. {ex.Message}";
+            await AlertMessageChanged.InvokeAsync(AlertMessage);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Get operations failed. {ex.Message}");
+        }
+    }
+
+    private static string GetAmountClass(OperationType type)
+        => type is OperationType.Income ? "app-amount-positive" : "app-amount-negative";
+
+    private static string GetAmountSign(OperationType type)
+        => type is OperationType.Income ? "+" : "−";
+}

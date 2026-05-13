@@ -1,0 +1,53 @@
+@using BlazorSelfFinanceApp.Components.Pages.Admin.Profiles
+@using BlazorSelfFinanceApp.Components.Pages.Operations
+
+@page "/"
+@page "/home"
+@page "/index"
+
+<PageTitle>Home</PageTitle>
+
+<AuthorizeView>
+    <Authorized Context="userContext">
+        <div class="d-flex align-items-center mb-4">
+            <i class="bi bi-house-heart-fill fs-3 text-primary me-2" aria-hidden="true"></i>
+            <h1 class="h3 mb-0">Welcome, @userContext.User.Identity?.Name!</h1>
+        </div>
+
+        <AuthorizeView Roles="User">
+            <Authorized>
+                <Operations />
+            </Authorized>
+        </AuthorizeView>
+
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <Profiles />
+            </Authorized>
+        </AuthorizeView>
+
+    </Authorized>
+    <NotAuthorized>
+        <div class="container py-5">
+            <div class="row justify-content-center">
+                <div class="col-md-7 col-lg-6">
+                    <div class="app-card text-center">
+                        <i class="bi bi-piggy-bank-fill display-4 text-primary mb-3" aria-hidden="true"></i>
+                        <h1 class="h3 mb-2">Welcome to Self Finance App</h1>
+                        <p class="text-muted mb-4">Track your income and expenses, generate reports, and stay on top of your finances.</p>
+                        <div class="d-flex justify-content-center gap-2">
+                            <a class="btn btn-primary app-icon-btn" href="/auth/login">
+                                <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i>
+                                <span>Login</span>
+                            </a>
+                            <a class="btn btn-outline-primary app-icon-btn" href="/auth/register">
+                                <i class="bi bi-person-plus" aria-hidden="true"></i>
+                                <span>Register</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>

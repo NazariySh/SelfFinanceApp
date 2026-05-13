@@ -1,0 +1,88 @@
+﻿@page "/profile"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject ILogger<Profile> logger
+@inject IAccountService accountService
+
+<PageTitle>My Profile</PageTitle>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>Profile</h2>
+            <p class="lead">Welcome to your profile page.</p>
+
+            <AlertInfo @bind-Message="AlertMessage" />
+
+            <a class="btn btn-primary mb-3" href="/profile/edit">Edit Profile</a>
+
+            <h2>Account information</h2>
+
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Detailed: </h5>
+                    <p class="card-text">Username: @UserModel.UserName</p>
+                    <p class="card-text">Email: @UserModel.Email</p>
+                </div>
+            </div>
+
+            <button class="btn btn-danger mt-5" @onclick="@(async () => await DeleteAccountAsync())">Delete my account</button>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    public AppUserDto UserModel { get; set; } = new();
+    public string? AlertMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            var user = await accountService.GetAsync();
+
+            if (user != null)
+            {
+                UserModel = user;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load account information.");
+        }
+    }
+
+    private async Task DeleteAccountAsync()
+    {
+        var confirmation = await jsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete your account?");
+
+        if (confirmation)
+        {
+            try
+            {
+                await accountService.DeleteAsync();
+
+                navigationManager.NavigateTo("/auth/logout");
+            }
+            catch (HttpRequestException ex)
+            {
+                AlertMessage = $"Account deletion failed. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to delete account.");
+            }
+        }
+    }
+}

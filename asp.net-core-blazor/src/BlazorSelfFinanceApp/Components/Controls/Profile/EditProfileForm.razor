@@ -1,0 +1,119 @@
+﻿@using AutoMapper
+
+@rendermode InteractiveServer
+
+@inject ILogger<EditProfileForm> logger
+@inject IMapper mapper
+
+<AlertInfo @bind-Message="AlertMessage" />
+
+<EditForm EditContext="EditContext" OnValidSubmit="EditProfileAsync">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="userName">Username</label>
+        <InputText id="userName" class="form-control" @bind-Value="UserModel.UserName" />
+        <ValidationMessage For="@(() => UserModel.UserName)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="email">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="UserModel.Email" />
+        <ValidationMessage For="@(() => UserModel.Email)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <button type="submit" class="btn btn-primary">Edit</button>
+    </div>
+
+</EditForm>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public Func<Task<AppUserDto>>? OnLoadProfile { get; set; }
+
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<AppUserForUpdateDto> OnEdit { get; set; }
+
+    public EditContext EditContext { get; set; } = default!;
+    public AppUserForUpdateDto UserModel { get; set; } = new();
+    public string? AlertMessage { get; set; }
+
+    private ValidationMessageStore _validationMessageStore = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        EditContext = new EditContext(UserModel);
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            if (OnLoadProfile != null)
+            {
+                var user = await OnLoadProfile.Invoke();
+
+                if (user != null)
+                {
+                    UserModel = mapper.Map<AppUserForUpdateDto>(user);
+
+                    EditContext = new EditContext(UserModel);
+                    _validationMessageStore = new ValidationMessageStore(EditContext);
+
+                    EditContext.OnFieldChanged += HandleFieldChanged;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to load. {ex.Message}");
+        }
+    }
+
+    private async Task EditProfileAsync()
+    {
+        try
+        {
+            await OnEdit.InvokeAsync(UserModel);
+        }
+        catch (ValidationException ex)
+        {
+            HandleValidationErrors(ex.Errors);
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Edit failed. {ex.Message}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to edit. {ex.Message}");
+        }
+    }
+
+    private void HandleValidationErrors(Dictionary<string, string> validationErrors)
+    {
+        _validationMessageStore.Clear();
+
+        foreach (var (fieldName, errorMessage) in validationErrors)
+        {
+            _validationMessageStore.Add(EditContext.Field(fieldName), errorMessage);
+        }
+
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _validationMessageStore.Clear(e.FieldIdentifier);
+        EditContext.NotifyValidationStateChanged();
+    }
+}

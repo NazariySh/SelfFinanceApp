@@ -1,0 +1,51 @@
+@rendermode InteractiveServer
+
+@if (Message != null)
+{
+    <div class="alert @AlertClass alert-dismissible fade show d-flex align-items-center" role="alert">
+        <i class="bi @IconClass me-2 fs-5" aria-hidden="true"></i>
+        <div class="flex-grow-1">@Message</div>
+        <button class="btn-close" aria-label="Close" @onclick="CloseAlertAsync"></button>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string? Message { get; set; }
+
+    [Parameter]
+    public EventCallback<string> MessageChanged { get; set; }
+
+    [Parameter]
+    public AlertVariant Variant { get; set; } = AlertVariant.Info;
+
+    private string AlertClass => Variant switch
+    {
+        AlertVariant.Success => "alert-success",
+        AlertVariant.Warning => "alert-warning",
+        AlertVariant.Danger => "alert-danger",
+        _ => "alert-primary"
+    };
+
+    private string IconClass => Variant switch
+    {
+        AlertVariant.Success => "bi-check-circle-fill",
+        AlertVariant.Warning => "bi-exclamation-triangle-fill",
+        AlertVariant.Danger => "bi-exclamation-octagon-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    private async Task CloseAlertAsync()
+    {
+        Message = null;
+        await MessageChanged.InvokeAsync(Message);
+    }
+
+    public enum AlertVariant
+    {
+        Info,
+        Success,
+        Warning,
+        Danger
+    }
+}

@@ -1,0 +1,42 @@
+﻿@using BlazorSelfFinanceApp.Components.Controls.Profile
+@using Shared.Enums
+
+@page "/profiles/create"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@rendermode InteractiveServer
+
+@inject IAccountService accountService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>New Profile</h2>
+
+            <AlertInfo @bind-Message="AlertMessage" />
+
+            <div class="form-group mb-3">
+                <label for="reportType">Role Type</label>
+                <InputSelect id="reportType" class="form-control" @bind-Value="RoleType">
+                    @foreach (var roleType in Enum.GetValues(typeof(RoleType)))
+                    {
+                        <option value="@roleType">@roleType</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <CreateProfileForm OnCreate="CreateProfileAsync" @bind-AlertMessage="AlertMessage" />
+        </div>
+    </div>
+</div>
+
+@code {
+    public RoleType RoleType { get; set; }
+    public string? AlertMessage { get; set; }
+
+    private async Task CreateProfileAsync(AppUserForCreationDto appUserModel)
+    {
+        await accountService.CreateAsync(appUserModel, RoleType.ToString());
+
+        navigationManager.NavigateTo("/", forceLoad: true);
+    }
+}

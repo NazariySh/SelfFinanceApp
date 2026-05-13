@@ -1,0 +1,77 @@
+@if (TotalPages > 1)
+{
+    <nav aria-label="Pagination">
+        <ul class="pagination app-pagination mb-0">
+            <li class="page-item @(CurrentPage <= 1 ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => GoToAsync(1)" disabled="@(CurrentPage <= 1)" aria-label="First page" title="First page">
+                    <i class="bi bi-chevron-double-left" aria-hidden="true"></i>
+                </button>
+            </li>
+            <li class="page-item @(CurrentPage <= 1 ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => GoToAsync(CurrentPage - 1)" disabled="@(CurrentPage <= 1)" aria-label="Previous page" title="Previous page">
+                    <i class="bi bi-chevron-left" aria-hidden="true"></i>
+                </button>
+            </li>
+
+            @foreach (var pageNumber in GetVisiblePages())
+            {
+                <li class="page-item @(pageNumber == CurrentPage ? "active" : "")">
+                    <button type="button" class="page-link" @onclick="() => GoToAsync(pageNumber)" aria-current="@(pageNumber == CurrentPage ? "page" : null)">@pageNumber</button>
+                </li>
+            }
+
+            <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => GoToAsync(CurrentPage + 1)" disabled="@(CurrentPage >= TotalPages)" aria-label="Next page" title="Next page">
+                    <i class="bi bi-chevron-right" aria-hidden="true"></i>
+                </button>
+            </li>
+            <li class="page-item @(CurrentPage >= TotalPages ? "disabled" : "")">
+                <button type="button" class="page-link" @onclick="() => GoToAsync(TotalPages)" disabled="@(CurrentPage >= TotalPages)" aria-label="Last page" title="Last page">
+                    <i class="bi bi-chevron-double-right" aria-hidden="true"></i>
+                </button>
+            </li>
+        </ul>
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public int CurrentPage { get; set; }
+
+    [Parameter, EditorRequired]
+    public int TotalPages { get; set; }
+
+    [Parameter]
+    public int MaxPagesShown { get; set; } = 5;
+
+    [Parameter, EditorRequired]
+    public EventCallback<int> OnPageChanged { get; set; }
+
+    private IEnumerable<int> GetVisiblePages()
+    {
+        if (TotalPages <= 0)
+        {
+            yield break;
+        }
+
+        var half = MaxPagesShown / 2;
+        var start = Math.Max(1, CurrentPage - half);
+        var end = Math.Min(TotalPages, start + MaxPagesShown - 1);
+        start = Math.Max(1, end - MaxPagesShown + 1);
+
+        for (var i = start; i <= end; i++)
+        {
+            yield return i;
+        }
+    }
+
+    private Task GoToAsync(int page)
+    {
+        if (page < 1 || page > TotalPages || page == CurrentPage)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnPageChanged.InvokeAsync(page);
+    }
+}

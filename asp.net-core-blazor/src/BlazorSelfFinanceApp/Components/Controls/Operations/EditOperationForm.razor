@@ -1,0 +1,147 @@
+﻿@using Shared.Enums
+@using AutoMapper
+
+@rendermode InteractiveServer
+
+@inject ILogger<EditOperationForm> logger
+@inject IMapper mapper
+
+<AlertInfo @bind-Message="@AlertMessage" />
+
+<EditForm EditContext="EditContext" OnValidSubmit="EditOperationAsync">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="date" class="form-label">Date</label>
+        <InputDate Type="InputDateType.DateTimeLocal" id="date" class="form-control" @bind-Value="OperationModel.Date" />
+        <ValidationMessage For="@(() => OperationModel.Date)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="type" class="form-label">Type</label>
+        <InputSelect id="type" class="form-select" @bind-Value="OperationModel.Type">
+            @foreach (var type in Enum.GetValues(typeof(OperationType)))
+            {
+                <option value="@type">@type</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="amount" class="form-label">Amount</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
+            <InputNumber id="amount" class="form-control" @bind-Value="OperationModel.Amount" />
+        </div>
+        <ValidationMessage For="@(() => OperationModel.Amount)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="description" class="form-label">Description</label>
+        <InputText id="description" class="form-control" @bind-Value="OperationModel.Description" />
+        <ValidationMessage For="@(() => OperationModel.Description)" />
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-4">
+        <a href="/" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary app-icon-btn">
+            <i class="bi bi-save" aria-hidden="true"></i>
+            <span>Save</span>
+        </button>
+    </div>
+
+</EditForm>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public Func<Task<FinancialOperationDto>>? OnLoadOperation { get; set; }
+
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<FinancialOperationForUpdateDto> OnEdit { get; set; }
+
+    public EditContext EditContext { get; set; } = default!;
+    public FinancialOperationForUpdateDto OperationModel { get; set; } = new();
+    public string? AlertMessage { get; set; }
+
+    private ValidationMessageStore _validationMessageStore = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        EditContext = new EditContext(OperationModel);
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            if (OnLoadOperation != null)
+            {
+                var operation = await OnLoadOperation.Invoke();
+
+                if (operation != null)
+                {
+                    OperationModel = mapper.Map<FinancialOperationForUpdateDto>(operation);
+
+                    EditContext = new EditContext(OperationModel);
+                    _validationMessageStore = new ValidationMessageStore(EditContext);
+
+                    EditContext.OnFieldChanged += HandleFieldChanged;
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Operation load failed. {ex.Message}");
+        }
+    }
+
+    private async Task EditOperationAsync()
+    {
+        try
+        {
+            await OnEdit.InvokeAsync(OperationModel);
+        }
+        catch (ValidationException ex)
+        {
+            HandleValidationErrors(ex.Errors);
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Operation update failed. {ex.Message}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Operation update failed. {ex.Message}");
+        }
+    }
+
+    private void HandleValidationErrors(Dictionary<string, string> validationErrors)
+    {
+        _validationMessageStore.Clear();
+
+        foreach (var (fieldName, errorMessage) in validationErrors)
+        {
+            _validationMessageStore.Add(EditContext.Field(fieldName), errorMessage);
+        }
+
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _validationMessageStore.Clear(e.FieldIdentifier);
+        EditContext.NotifyValidationStateChanged();
+    }
+}

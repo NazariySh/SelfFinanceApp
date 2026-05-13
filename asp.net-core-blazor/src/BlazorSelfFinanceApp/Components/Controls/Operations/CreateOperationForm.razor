@@ -1,0 +1,114 @@
+@using Shared.Enums
+
+@rendermode InteractiveServer
+
+@inject ILogger<CreateOperationForm> logger
+
+<AlertInfo @bind-Message="AlertMessage" />
+
+<EditForm EditContext="EditContext" OnValidSubmit="CreateOperationAsync">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="date" class="form-label">Date</label>
+        <InputDate Type="InputDateType.DateTimeLocal" id="date" class="form-control" @bind-Value="Operation.Date" />
+        <ValidationMessage For="@(() => Operation.Date)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="type" class="form-label">Type</label>
+        <InputSelect id="type" class="form-select" @bind-Value="Operation.Type">
+            @foreach (var type in Enum.GetValues(typeof(OperationType)))
+            {
+                <option value="@type">@type</option>
+            }
+        </InputSelect>
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="amount" class="form-label">Amount</label>
+        <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-currency-dollar" aria-hidden="true"></i></span>
+            <InputNumber id="amount" class="form-control" @bind-Value="Operation.Amount" />
+        </div>
+        <ValidationMessage For="@(() => Operation.Amount)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="description" class="form-label">Description</label>
+        <InputText id="description" class="form-control" @bind-Value="Operation.Description" />
+        <ValidationMessage For="@(() => Operation.Description)" />
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-4">
+        <a href="/" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary app-icon-btn">
+            <i class="bi bi-check-circle" aria-hidden="true"></i>
+            <span>Create</span>
+        </button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<FinancialOperationForCreationDto> OnCreate { get; set; }
+
+    public EditContext EditContext { get; set; } = default!;
+    public FinancialOperationForCreationDto Operation { get; set; } = new();
+    public string? AlertMessage { get; set; }
+
+    private ValidationMessageStore _validationMessageStore = default!;
+
+    protected override void OnInitialized()
+    {
+        Operation.Date = DateTime.Now;
+
+        EditContext = new EditContext(Operation);
+        _validationMessageStore = new ValidationMessageStore(EditContext);
+
+        EditContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private async Task CreateOperationAsync()
+    {
+        try
+        {
+            await OnCreate.InvokeAsync(Operation);
+        }
+        catch (ValidationException ex)
+        {
+            HandleValidationErrors(ex.Errors);
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Operation creation failed. {ex.Message}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Operation creation failed. {ex.Message}");
+        }
+    }
+
+    private void HandleValidationErrors(Dictionary<string, string> validationErrors)
+    {
+        _validationMessageStore.Clear();
+
+        foreach (var (fieldName, errorMessage) in validationErrors)
+        {
+            _validationMessageStore.Add(EditContext.Field(fieldName), errorMessage);
+        }
+
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _validationMessageStore.Clear(e.FieldIdentifier);
+        EditContext.NotifyValidationStateChanged();
+    }
+}

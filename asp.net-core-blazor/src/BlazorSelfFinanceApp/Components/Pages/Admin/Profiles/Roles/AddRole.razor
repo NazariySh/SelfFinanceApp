@@ -1,0 +1,64 @@
+﻿@using BlazorSelfFinanceApp.Enums
+@using Shared.Enums
+
+@page "/profiles/{userId}/roles/add"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@rendermode InteractiveServer
+
+@inject ILogger<AddRole> logger
+@inject IAccountService accountService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>Add Role</h2>
+
+            <AlertInfo @bind-Message="AlertMessage" />
+
+            <div class="mb-3">
+                <label for="reportType">Report Type</label>
+                <InputSelect id="reportType" class="form-control" @bind-Value="RoleType">
+                    @foreach (var roleType in Enum.GetValues(typeof(RoleType)))
+                    {
+                        <option value="@roleType">@roleType</option>
+                    }
+                </InputSelect>
+            </div>
+
+            <div class="form-group mt-3">
+                <button class="btn btn-primary" @onclick="async () => await AddRoleAsync(RoleType)">Add role</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = string.Empty;
+
+    public RoleType RoleType { get; set; }
+    public string? AlertMessage { get; set; }
+
+    private async Task AddRoleAsync(RoleType roleType)
+    {
+        try
+        {
+            await accountService.AddRoleAsync(UserId, roleType.ToString());
+
+            navigationManager.NavigateTo($"/profiles/{UserId}/roles");
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Failed to add role. {ex.Message}";
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to add role. {ex.Message}");
+        }
+    }
+}

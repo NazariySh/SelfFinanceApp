@@ -1,0 +1,39 @@
+﻿@using BlazorSelfFinanceApp.Enums
+
+@page "/operations/report"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>My Financial Report</PageTitle>
+
+<div class="container mb-3">
+    <div class="row">
+        <h2>Operations Report</h2>
+
+        <AlertInfo @bind-Message="AlertMessage" />
+
+        <div class="col-md-3">
+            <label for="reportType">Report Type</label>
+            <InputSelect id="reportType" class="form-control" @bind-Value="ReportType">
+                @foreach (var reportType in Enum.GetValues(typeof(ReportType)))
+                {
+                    <option value="@reportType">@reportType</option>
+                }
+            </InputSelect>
+        </div>
+    </div>
+</div>
+
+@if (ReportType is ReportType.Daily)
+{
+    <DateReport @bind-AlertMessage="AlertMessage" />
+}
+else
+{
+    <PeriodReport @bind-AlertMessage="AlertMessage" />
+}
+
+@code {
+    public ReportType ReportType { get; set; }
+    public string? AlertMessage { get; set; }
+}

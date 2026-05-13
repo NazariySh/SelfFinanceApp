@@ -1,0 +1,107 @@
+﻿@rendermode InteractiveServer
+
+@inject ILogger<CreateProfileForm> logger
+
+<EditForm EditContext="EditContext" OnValidSubmit="CreateProfileAsync">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+        <label for="userName">Username</label>
+        <InputText id="userName" class="form-control" @bind-Value="AppUserModel.UserName" />
+        <ValidationMessage For="@(() => AppUserModel.UserName)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="email">Email</label>
+        <InputText id="email" class="form-control" @bind-Value="AppUserModel.Email" />
+        <ValidationMessage For="@(() => AppUserModel.Email)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="password">Password</label>
+        <InputText type="password" id="password" class="form-control" @bind-Value="AppUserModel.Password" />
+        <ValidationMessage For="@(() => AppUserModel.Password)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <label for="confirmPassword">Confirm password</label>
+        <InputText type="password" id="confirmPassword" class="form-control" @bind-Value="AppUserModel.ConfirmPassword" />
+        <ValidationMessage For="@(() => AppUserModel.ConfirmPassword)" />
+    </div>
+
+    <div class="form-group mt-3">
+        <button type="submit" class="btn btn-primary">@SubmitButtonText</button>
+    </div>
+
+</EditForm>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<AppUserForCreationDto> OnCreate { get; set; }
+
+    [Parameter]
+    public string? AlertMessage { get; set; }
+
+    [Parameter]
+    public EventCallback<string> AlertMessageChanged { get; set; }
+
+    [Parameter]
+    public string SubmitButtonText { get; set; } = "Create";
+
+    public EditContext EditContext { get; set; } = default!;
+    public AppUserForCreationDto AppUserModel { get; set; } = new();
+
+    private ValidationMessageStore _validationMessageStore = default!;
+
+    protected override void OnInitialized()
+    {
+        EditContext = new EditContext(AppUserModel);
+        _validationMessageStore = new ValidationMessageStore(EditContext);
+
+        EditContext.OnFieldChanged += HandleFieldChanged;
+    }
+
+    private async Task CreateProfileAsync()
+    {
+        try
+        {
+            await OnCreate.InvokeAsync(AppUserModel);
+        }
+        catch (ValidationException ex)
+        {
+            HandleValidationErrors(ex.Errors);
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Failed to register. {ex.Message}";
+            await AlertMessageChanged.InvokeAsync(AlertMessage);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to register. {ex.Message}");
+        }
+    }
+
+    private void HandleValidationErrors(Dictionary<string, string> validationErrors)
+    {
+        _validationMessageStore.Clear();
+
+        foreach (var (fieldName, errorMessage) in validationErrors)
+        {
+            _validationMessageStore.Add(EditContext.Field(fieldName), errorMessage);
+        }
+
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void HandleFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _validationMessageStore.Clear(e.FieldIdentifier);
+        EditContext.NotifyValidationStateChanged();
+    }
+}

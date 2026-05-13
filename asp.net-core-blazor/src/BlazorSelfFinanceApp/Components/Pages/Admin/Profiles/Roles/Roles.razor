@@ -1,0 +1,126 @@
+﻿@using BlazorSelfFinanceApp.Enums
+@using Shared.Enums
+
+@page "/profiles/{userId}/roles"
+@attribute [Authorize(Policy = "AdminPolicy")]
+@attribute [StreamRendering]
+
+@inject ILogger<Roles> logger
+@inject IAccountService accountService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6">
+            <AlertInfo @bind-Message="AlertMessage" />
+
+            @if (UserModel is null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                <h2>User @UserModel.UserName account information</h2>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Detailed: </h5>
+                        <p class="card-text">Username: @UserModel.UserName</p>
+                        <p class="card-text">Email: @UserModel.Email</p>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-3">
+                    <button class="btn btn-primary" @onclick="AddRole">Add role</button>
+                </div>
+
+                <table class="table mt-3">
+                    <thead>
+                        <tr>
+                            <th scope="col">#</th>
+                            <th scope="col">Role name</th>
+                            <th scope="col" class="text-center">Options</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var role in UserModel.Roles)
+                        {
+                            <tr>
+                                <th scope="row">@(UserModel.Roles.IndexOf(role) + 1)</th>
+                                <td>@role</td>
+                                <td>
+                                    <div class="d-flex justify-content-center" role="group" aria-label="Options">
+                                        <button @onclick="@(async () => await RemoveRoleAsync(role))" class="btn btn-md btn-danger mx-1">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = string.Empty;
+
+    public AppUserDto? UserModel { get; set; }
+    public string? AlertMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            var user = await accountService.GetByIdAsync(UserId);
+
+            if (user != null)
+            {
+                UserModel = user;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load account information.");
+        }
+    }
+
+    private void AddRole()
+    {
+        navigationManager.NavigateTo($"/profiles/{UserId}/roles/add");
+    }
+
+    private async Task RemoveRoleAsync(string roleName)
+    {
+        var confirmation = await jsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this profile role?");
+
+        if (confirmation)
+        {
+            try
+            {
+                await accountService.RemoveRoleAsync(UserId, roleName);
+
+                await LoadDataAsync();
+
+                StateHasChanged();
+            }
+            catch (HttpRequestException ex)
+            {
+                AlertMessage = $"Role deletion failed. {ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                logger.LogError($"Role deletion failed. {ex.Message}");
+            }
+        }
+    }
+}

@@ -1,0 +1,103 @@
+﻿@using Shared.Enums
+
+@rendermode InteractiveServer
+
+@inject ILogger<PeriodReport> logger
+@inject IFinancialReportService financialReportService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="startDate">Start Date</label>
+                <InputDate id="startDate" class="form-control" @bind-Value="StartDate" />
+            </div>
+
+            <div class="form-group mt-3">
+                <label for="endDate">End Date</label>
+                <InputDate id="endDate" class="form-control" @bind-Value="EndDate" />
+            </div>
+
+            <div class="form-group mt-3">
+                <button class="btn btn-primary" @onclick="async () => await GetPeriodReportAsync(StartDate, EndDate)">Get Operations</button>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            @if (ReportModel != null)
+            {
+                <div class="table mt-3">
+                    <h3>Operations from @ReportModel.StartDate to @ReportModel.EndDate</h3>
+                    <p>Total Income: <span class="text-success">@ReportModel.TotalIncome</span></p>
+                    <p>Total Expense: <span class="text-danger">@ReportModel.TotalExpense</span></p>
+
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var operation in ReportModel.Operations)
+                            {
+                                <tr>
+                                    <td>@operation.Date</td>
+                                    <td>@operation.Type</td>
+                                    <td class="@GetAmountClass(operation.Type)">@GetAmountSign(operation.Type)@operation.Amount.ToString("N2")</td>
+                                    <td>@operation.Description</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? AlertMessage { get; set; }
+
+    [Parameter]
+    public EventCallback<string> AlertMessageChanged { get; set; }
+
+    public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DateOnly EndDate { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    public DatePeriodReport? ReportModel { get; set; }
+
+    private async Task GetPeriodReportAsync(DateOnly startDate, DateOnly endDate)
+    {
+        try
+        {
+            var periodReport = await financialReportService.GetDatePeriodReportAsync(startDate, endDate);
+
+            if (periodReport != null)
+            {
+                ReportModel = periodReport;
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Get operations failed. {ex.Message}";
+            await AlertMessageChanged.InvokeAsync(AlertMessage);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Get operations failed. {ex.Message}");
+        }
+    }
+
+    private static string GetAmountClass(OperationType type)
+        => type is OperationType.Income ? "app-amount-positive" : "app-amount-negative";
+
+    private static string GetAmountSign(OperationType type)
+        => type is OperationType.Income ? "+" : "−";
+}

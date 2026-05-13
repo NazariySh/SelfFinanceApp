@@ -1,0 +1,234 @@
+@attribute [StreamRendering]
+
+@inject ILogger<Profiles> logger
+@inject IAccountService accountService
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h3 class="mb-0">Profiles</h3>
+        <div class="app-section-subtitle">Manage user accounts and roles.</div>
+    </div>
+    <a class="btn btn-primary app-icon-btn" href="/profiles/create">
+        <i class="bi bi-person-plus" aria-hidden="true"></i>
+        <span>New Profile</span>
+    </a>
+</div>
+
+<AlertInfo @bind-Message="AlertMessage" />
+
+<div class="app-card">
+    @if (Users is null)
+    {
+        <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (Users.Count == 0)
+    {
+        <div class="app-empty">
+            <i class="bi bi-people" aria-hidden="true"></i>
+            <div>No profiles found.</div>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table app-table align-middle">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">User</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Roles</th>
+                        <th scope="col" class="text-end">Options</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Users)
+                    {
+                        <tr>
+                            <th scope="row">@(((PageNumber - 1) * PageSize) + Users.IndexOf(user) + 1)</th>
+                            <td>
+                                <span class="app-user-cell">
+                                    <span class="app-avatar">@GetInitials(user.UserName)</span>
+                                    <span>@user.UserName</span>
+                                </span>
+                            </td>
+                            <td>@user.Email</td>
+                            <td>
+                                @foreach (var role in user.Roles)
+                                {
+                                    <span class="badge rounded-pill app-role-badge @(role == "Admin" ? "admin" : "")">@role</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Options">
+                                    <button @onclick="@(() => ViewOperations(user.Id))" class="btn btn-outline-secondary app-icon-btn" title="View operations">
+                                        <i class="bi bi-list-ul" aria-hidden="true"></i>
+                                        <span class="d-none d-lg-inline">Operations</span>
+                                    </button>
+                                    <button @onclick="@(() => ChangeRoles(user.Id))" class="btn btn-outline-secondary app-icon-btn" title="Change roles">
+                                        <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                                        <span class="d-none d-lg-inline">Roles</span>
+                                    </button>
+                                    <button @onclick="@(() => Edit(user.Id))" class="btn btn-outline-primary app-icon-btn" title="Edit">
+                                        <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline">Edit</span>
+                                    </button>
+                                    <button @onclick="@(async () => await DeleteAsync(user.Id))" class="btn btn-outline-danger app-icon-btn" title="Delete">
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline">Delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-3 gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0 app-page-info" for="profilesPageSizeSelect">Page size:</label>
+                <select id="profilesPageSizeSelect" class="form-select form-select-sm" style="width:auto"
+                        @bind="PageSize" @bind:after="OnPageSizeChangedAsync">
+                    @foreach (var size in PageSizeOptions)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </select>
+                <span class="app-page-info">
+                    Showing @(((PageNumber - 1) * PageSize) + 1)–@(Math.Min(PageNumber * PageSize, TotalCount)) of @TotalCount
+                </span>
+            </div>
+            <Paginator CurrentPage="PageNumber" TotalPages="TotalPages" OnPageChanged="OnPageChangedAsync" />
+        </div>
+    }
+</div>
+
+@code {
+    public List<AppUserDto>? Users { get; set; }
+    public string? AlertMessage { get; set; }
+
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; }
+
+    private static readonly int[] PageSizeOptions = [5, 10, 20, 50];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            var parameters = new PaginationParameters
+            {
+                PageNumber = PageNumber,
+                PageSize = PageSize
+            };
+
+            var pagedUsers = await accountService.GetAllAsync(parameters);
+
+            Users = pagedUsers.Items;
+            PageNumber = pagedUsers.PageNumber;
+            PageSize = pagedUsers.PageSize;
+            TotalCount = pagedUsers.TotalCount;
+            TotalPages = pagedUsers.TotalPages;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Profiles loading failed. {ex.Message}");
+        }
+    }
+
+    private async Task OnPageChangedAsync(int newPage)
+    {
+        PageNumber = newPage;
+
+        await LoadDataAsync();
+    }
+
+    private async Task OnPageSizeChangedAsync()
+    {
+        PageNumber = 1;
+
+        await LoadDataAsync();
+    }
+
+    private void ViewOperations(string id)
+    {
+        navigationManager.NavigateTo($"/profiles/{id}/operations");
+    }
+
+    private void ChangeRoles(string id)
+    {
+        navigationManager.NavigateTo($"/profiles/{id}/roles");
+    }
+
+    private void Edit(string id)
+    {
+        navigationManager.NavigateTo($"/profiles/{id}/edit");
+    }
+
+    private async Task DeleteAsync(string id)
+    {
+        var confirmation = await jsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this profile information?");
+
+        if (!confirmation)
+        {
+            return;
+        }
+
+        try
+        {
+            await accountService.DeleteAsync(id);
+
+            // If the delete left the current page empty (and we're not on page 1), step back.
+            if (PageNumber > 1 && TotalCount - 1 <= (PageNumber - 1) * PageSize)
+            {
+                PageNumber--;
+            }
+
+            await LoadDataAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Profile deletion failed. {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Profile deletion failed. {ex.Message}");
+        }
+    }
+
+    private static string GetInitials(string? userName)
+    {
+        if (string.IsNullOrWhiteSpace(userName))
+        {
+            return "?";
+        }
+
+        var trimmed = userName.Trim();
+        var parts = trimmed.Split(new[] { ' ', '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length >= 2)
+        {
+            return $"{char.ToUpperInvariant(parts[0][0])}{char.ToUpperInvariant(parts[1][0])}";
+        }
+
+        return trimmed.Length >= 2
+            ? trimmed[..2].ToUpperInvariant()
+            : trimmed[..1].ToUpperInvariant();
+    }
+}

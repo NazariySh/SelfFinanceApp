@@ -1,0 +1,36 @@
+﻿@using BlazorSelfFinanceApp.Components.Controls.Operations
+
+@page "/profiles/{userId}/operations/{id:guid}"
+@attribute [Authorize(Policy = "AdminPolicy")]
+
+@inject IFinancialOperationService financialOperationService
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>Edit Operation</h2>
+
+            <EditOperationForm OnLoadOperation="GetOperationAsync" OnEdit="EditOperationAsync" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = default!;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Task<FinancialOperationDto?> GetOperationAsync()
+    {
+        return financialOperationService.GetByIdAsync(Id, UserId);
+    }
+
+    private async Task EditOperationAsync(FinancialOperationForUpdateDto operationModel)
+    {
+        await financialOperationService.UpdateAsync(Id, operationModel, UserId);
+
+        navigationManager.NavigateTo($"/profiles/{UserId}/operations");
+    }
+}

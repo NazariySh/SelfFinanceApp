@@ -1,0 +1,240 @@
+@using Shared.Enums
+@implements IDisposable
+
+@attribute [StreamRendering]
+
+@inject ILogger<OperationsTable> logger
+
+<AlertInfo @bind-Message="AlertMessage" />
+
+<div class="app-card">
+    @if (FinancialOperations is null)
+    {
+        <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (FinancialOperations.Count == 0)
+    {
+        <div class="app-empty">
+            <i class="bi bi-inbox" aria-hidden="true"></i>
+            <div>No operations found.</div>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table app-table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Type</th>
+                        <th scope="col" class="text-end">Amount</th>
+                        <th scope="col">Description</th>
+                        <th scope="col" class="text-end">Options</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var operation in FinancialOperations)
+                    {
+                        <tr>
+                            <th scope="row">@(((PageNumber - 1) * PageSize) + FinancialOperations.IndexOf(operation) + 1)</th>
+                            <td>@operation.Date.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <span class="badge rounded-pill @GetTypeBadgeClass(operation.Type)">
+                                    <i class="bi @GetTypeIcon(operation.Type) me-1" aria-hidden="true"></i>
+                                    @operation.Type
+                                </span>
+                            </td>
+                            <td class="text-end @GetAmountClass(operation.Type)">
+                                @GetAmountSign(operation.Type)@operation.Amount.ToString("N2")
+                            </td>
+                            <td>@operation.Description</td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Options">
+                                    <button @onclick="() => OnEdit.InvokeAsync(operation.Id)" class="btn btn-outline-primary app-icon-btn" title="Edit">
+                                        <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline">Edit</span>
+                                    </button>
+                                    <button @onclick="() => DeleteAsync(operation.Id)" class="btn btn-outline-danger app-icon-btn" title="Delete">
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline">Delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (FinancialOperations is not null && TotalCount > 0)
+    {
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mt-3 gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <label class="mb-0 app-page-info" for="pageSizeSelect">Page size:</label>
+                <select id="pageSizeSelect" class="form-select form-select-sm" style="width:auto"
+                        @bind="PageSize" @bind:after="OnPageSizeChangedAsync">
+                    @foreach (var size in PageSizeOptions)
+                    {
+                        <option value="@size">@size</option>
+                    }
+                </select>
+                <span class="app-page-info">
+                    Showing @(((PageNumber - 1) * PageSize) + 1)–@(Math.Min(PageNumber * PageSize, TotalCount)) of @TotalCount
+                </span>
+            </div>
+            <Paginator CurrentPage="PageNumber" TotalPages="TotalPages" OnPageChanged="OnPageChangedAsync" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    [EditorRequired]
+    public Func<PaginationParameters, Task<PagedList<FinancialOperationDto>>>? OnLoadData { get; set; }
+
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<Guid> OnEdit { get; set; }
+
+    [Parameter]
+    [EditorRequired]
+    public EventCallback<Guid> OnDelete { get; set; }
+
+    [Parameter]
+    public int InitialPageSize { get; set; } = 10;
+
+    public List<FinancialOperationDto>? FinancialOperations { get; set; }
+    public string? AlertMessage { get; set; }
+
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; }
+    public int TotalCount { get; set; }
+    public int TotalPages { get; set; }
+
+    private static readonly int[] PageSizeOptions = [5, 10, 20, 50];
+
+    private CancellationTokenSource? _loadCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PageSize = InitialPageSize;
+
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        if (OnLoadData is null)
+        {
+            return;
+        }
+
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        var token = _loadCts.Token;
+
+        try
+        {
+            var parameters = new PaginationParameters
+            {
+                PageNumber = PageNumber,
+                PageSize = PageSize
+            };
+
+            var pagedResult = await OnLoadData.Invoke(parameters);
+
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            FinancialOperations = pagedResult.Items;
+            PageNumber = pagedResult.PageNumber;
+            PageSize = pagedResult.PageSize;
+            TotalCount = pagedResult.TotalCount;
+            TotalPages = pagedResult.TotalPages;
+        }
+        catch (OperationCanceledException)
+        {
+            // Newer load supersedes this one; nothing to do.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to load operations. {ex.Message}");
+        }
+    }
+
+    private async Task OnPageChangedAsync(int newPage)
+    {
+        PageNumber = newPage;
+
+        await LoadDataAsync();
+    }
+
+    private async Task OnPageSizeChangedAsync()
+    {
+        PageNumber = 1;
+
+        await LoadDataAsync();
+    }
+
+    private async Task DeleteAsync(Guid id)
+    {
+        var confirmation = await jsRuntime.InvokeAsync<bool>("confirm", "Are you sure you want to delete this operation?");
+
+        if (!confirmation)
+        {
+            return;
+        }
+
+        try
+        {
+            await OnDelete.InvokeAsync(id);
+
+            // If the delete left the current page empty (and we're not on page 1), step back.
+            if (PageNumber > 1 && TotalCount - 1 <= (PageNumber - 1) * PageSize)
+            {
+                PageNumber--;
+            }
+
+            await LoadDataAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            AlertMessage = $"Operation deletion failed. {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Operation deletion failed. {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+    }
+
+    private static string GetTypeBadgeClass(OperationType type)
+        => type is OperationType.Income ? "app-badge-income" : "app-badge-expense";
+
+    private static string GetTypeIcon(OperationType type)
+        => type is OperationType.Income ? "bi-arrow-down-circle" : "bi-arrow-up-circle";
+
+    private static string GetAmountClass(OperationType type)
+        => type is OperationType.Income ? "app-amount-positive" : "app-amount-negative";
+
+    private static string GetAmountSign(OperationType type)
+        => type is OperationType.Income ? "+" : "−";
+}

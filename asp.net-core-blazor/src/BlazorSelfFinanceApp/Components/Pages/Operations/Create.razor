@@ -1,0 +1,31 @@
+@using BlazorSelfFinanceApp.Components.Controls.Operations
+
+@page "/operations/create"
+@attribute [Authorize]
+
+@inject IFinancialOperationService financialOperationService
+
+<PageTitle>New Operation</PageTitle>
+
+<div class="app-form-card app-card">
+    <div class="app-card-header">
+        <div>
+            <h2 class="app-card-title">
+                <i class="bi bi-cash-coin me-2 text-primary" aria-hidden="true"></i>
+                Create New Operation
+            </h2>
+            <div class="app-section-subtitle">Record an income or expense.</div>
+        </div>
+    </div>
+
+    <CreateOperationForm OnCreate="CreateOperationAsync" />
+</div>
+
+@code {
+    private async Task CreateOperationAsync(FinancialOperationForCreationDto operation)
+    {
+        await financialOperationService.CreateAsync(operation);
+
+        navigationManager.NavigateTo("/", forceLoad: true);
+    }
+}

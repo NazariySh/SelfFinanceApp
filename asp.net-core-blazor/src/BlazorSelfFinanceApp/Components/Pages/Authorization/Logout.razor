@@ -1,0 +1,27 @@
+﻿@page "/auth/logout"
+
+@inject ILogger<Logout> logger
+@inject IAuthenticationService authenticationService
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await LogoutAsync();
+    }
+
+    private async Task LogoutAsync()
+    {
+        try
+        {
+            await authenticationService.LogoutAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogError($"Failed to logout. {ex.Message}");
+        }
+        finally
+        {
+            navigationManager.NavigateTo("/", forceLoad: true);
+        }
+    }
+}

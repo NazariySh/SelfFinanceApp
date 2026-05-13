@@ -1,0 +1,39 @@
+@using BlazorSelfFinanceApp.Components.Controls.Operations
+
+@page "/profiles/{userId}/operations"
+@attribute [Authorize(Policy = "AdminPolicy")]
+
+@inject IFinancialOperationService financialOperationService
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <div>
+        <h3 class="mb-0">User Operations</h3>
+        <div class="app-section-subtitle">Operations for the selected profile.</div>
+    </div>
+    <a class="btn btn-outline-secondary app-icon-btn" href="/">
+        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+        <span>Back to profiles</span>
+    </a>
+</div>
+
+<OperationsTable OnLoadData="LoadDataAsync" OnEdit="Edit" OnDelete="DeleteAsync" />
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = default!;
+
+    private Task<PagedList<FinancialOperationDto>> LoadDataAsync(PaginationParameters parameters)
+    {
+        return financialOperationService.GetAllAsync(UserId, parameters);
+    }
+
+    private void Edit(Guid id)
+    {
+        navigationManager.NavigateTo($"/profiles/{UserId}/operations/{id}");
+    }
+
+    private Task DeleteAsync(Guid id)
+    {
+        return financialOperationService.DeleteAsync(id, UserId);
+    }
+}

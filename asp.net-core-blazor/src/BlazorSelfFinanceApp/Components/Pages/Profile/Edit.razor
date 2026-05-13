@@ -1,0 +1,32 @@
+﻿@using BlazorSelfFinanceApp.Components.Controls.Profile
+
+@page "/profile/edit"
+@attribute [Authorize]
+
+@inject IAccountService accountService
+
+<PageTitle>Update Profile</PageTitle>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-4">
+            <h2>Edit My Profile</h2>
+
+            <EditProfileForm OnLoadProfile="GetProfileAsync" OnEdit="EditProfileAsync" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private Task<AppUserDto?> GetProfileAsync()
+    {
+        return accountService.GetAsync();
+    }
+
+    private async Task EditProfileAsync(AppUserForUpdateDto userModel)
+    {
+        await accountService.UpdateAsync(userModel);
+
+        navigationManager.NavigateTo("/auth/logout", forceLoad: true);
+    }
+}      
