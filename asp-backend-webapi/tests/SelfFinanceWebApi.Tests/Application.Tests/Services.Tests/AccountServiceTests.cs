@@ -487,7 +487,13 @@ namespace SelfFinanceWebApi.Tests.Application.Tests.Services.Tests
         {
             var services = new ServiceCollection();
 
-            services.AddAutoMapper(typeof(AppUserProfile), typeof(TokenProfile));
+            services.AddLogging();
+
+            services.AddAutoMapper(cfg =>
+            {
+                cfg.AddProfile<AppUserProfile>();
+                cfg.AddProfile<TokenProfile>();
+            });
 
             services.AddKeyedSingleton<AbstractValidator<string>, UserNameValidator>(nameof(UserNameValidator));
             services.AddKeyedSingleton<AbstractValidator<string>, PasswordValidator>(nameof(PasswordValidator));

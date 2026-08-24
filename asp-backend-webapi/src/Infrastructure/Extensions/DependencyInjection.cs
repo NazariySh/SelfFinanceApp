@@ -1,6 +1,5 @@
 ﻿using Domain.Repository;
 using Infrastructure.Data;
-using Infrastructure.Factory;
 using Infrastructure.Repository;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -14,16 +13,11 @@ namespace Infrastructure.Extensions
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection");
 
-            services.AddDbContext<FinancialDbContext>(options =>
+            services.AddDbContextFactory<FinancialDbContext>(options =>
                 options.UseSqlServer(connectionString));
 
-            services.AddSingleton<IDbContextFactory<FinancialDbContext>, DbContextFactory>(_ =>
-            {
-                return new DbContextFactory(
-                        new DbContextOptionsBuilder<FinancialDbContext>()
-                        .UseSqlServer(connectionString)
-                        .Options);
-            });
+            services.AddScoped<FinancialDbContext>(sp =>
+                sp.GetRequiredService<IDbContextFactory<FinancialDbContext>>().CreateDbContext());
 
             services.AddScoped<IFinancialOperationRepository, FinancialOperationRepository>();
             services.AddScoped<IAccountRepository, AccountRepository>();
