@@ -149,7 +149,12 @@ namespace SelfFinanceWebApi.Tests.Application.Tests.Services.Tests
         {
             var services = new ServiceCollection();
 
-            services.AddAutoMapper(typeof(FinancialOperationProfile));
+            services.AddLogging();
+
+            services.AddAutoMapper(cfg =>
+            {
+                cfg.AddProfile<FinancialOperationProfile>();
+            });
 
             services.AddKeyedSingleton<AbstractValidator<string>, DescriptionValidator>(nameof(DescriptionValidator));
             services.AddKeyedSingleton<AbstractValidator<DateTime>, DateValidator>(nameof(DateValidator));
